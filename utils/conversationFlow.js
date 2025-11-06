@@ -90,10 +90,13 @@ Reply with the number of your choice.`,
             expenses: expenses,
             profit: profit,
             margin: margin.toFixed(2),
+            amount: sales, // Add amount field for compatibility
             description: `Daily shop record for ${date}`
           };
           
           await dataStorage.saveTransaction(session.phoneNumber, data);
+          
+          console.log('Data saved:', data); // Debug log
           
           return `Here's your summary for ${date} 🧾\n\nTotal Sales: ₹${sales.toFixed(2)}\nInventory Cost: ₹${inventoryCost.toFixed(2)}\nOther Expenses: ₹${expenses.toFixed(2)}\n\n📊 Profit / Loss Calculation:\nProfit = Sales - (Inventory Cost + Expenses)\n\n➡️ Net Profit: ₹${profit.toFixed(2)}\n💹 Profit Margin: ${margin.toFixed(2)}%\n\n💡 Here's what your numbers mean today 👇\n${insight}\n\n✅ Your daily record has been saved.\n\nReply "menu" to return to main menu.`;
         },
@@ -155,14 +158,16 @@ Reply with the number of your choice.`,
       {
         question: async (session) => {
           const transactions = await dataStorage.getTransactions(session.phoneNumber);
-          const dailyRecords = transactions.filter(t => t.type === 'dailySales').slice(-5).reverse();
+          console.log('All transactions:', transactions); // Debug log
+          const dailyRecords = transactions.filter(t => t.type === 'dailySales');
+          console.log('Daily records:', dailyRecords); // Debug log
           
           let message = `📝 Recent Daily Records\n\n`;
           
           if (dailyRecords.length === 0) {
             message += `No records found yet.\n`;
           } else {
-            dailyRecords.forEach((r, idx) => {
+            dailyRecords.slice(-5).reverse().forEach((r, idx) => {
               message += `${idx + 1}. ${r.date}\n`;
               message += `   Sales: ₹${r.sales} | Profit: ₹${r.profit}\n`;
               message += `   Margin: ${r.margin}%\n\n`;
