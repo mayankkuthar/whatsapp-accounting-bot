@@ -229,21 +229,27 @@ async function processMessage(phoneNumber, message) {
   const session = sessionManager.getSession(phoneNumber);
   const flow = flows[session.currentFlow];
   
+  console.log(`Processing: input="${input}", flow="${session.currentFlow}", step=${session.currentStep}`);
+  
   if (!flow) {
     sessionManager.resetSession(phoneNumber);
     return await getNextQuestion(sessionManager.getSession(phoneNumber));
   }
 
   const currentStep = flow.steps[session.currentStep];
+  console.log(`Current step has: field="${currentStep.field}", hasNext=${!!currentStep.next}, hasValidator=${!!currentStep.validator}`);
 
   // Handle flow navigation (e.g., main menu selection)
   if (currentStep && currentStep.next) {
+    console.log('Handling flow navigation');
     // Validate input if validator exists
     if (currentStep.validator && !currentStep.validator(input)) {
+      console.log('Validation failed for flow navigation');
       return currentStep.errorMessage || 'Invalid input. Please try again.';
     }
     
     const nextFlow = currentStep.next(input);
+    console.log(`Navigating to flow: ${nextFlow}`);
     sessionManager.updateSession(phoneNumber, {
       currentFlow: nextFlow,
       currentStep: 0,
@@ -252,10 +258,11 @@ async function processMessage(phoneNumber, message) {
     return await getNextQuestion(sessionManager.getSession(phoneNumber));
   }
 
-  // Validate and save the current step's input (not previous step)
+  // Validate and save the current step's input
   if (currentStep) {
     // Validate input if validator exists
     if (currentStep.validator && !currentStep.validator(input)) {
+      console.log(`Validation failed: ${input}`);
       return currentStep.errorMessage || 'Invalid input. Please try again.';
     }
 
@@ -263,12 +270,14 @@ async function processMessage(phoneNumber, message) {
     if (currentStep.field) {
       const value = currentStep.processor ? currentStep.processor(input) : input.trim();
       session.data[currentStep.field] = value;
+      console.log(`Saved: ${currentStep.field} = ${value}`);
     }
   }
 
   // Move to next step
   session.currentStep++;
   sessionManager.updateSession(phoneNumber, session);
+  console.log(`Moving to step ${session.currentStep}`);
 
   return await getNextQuestion(session);
 }
