@@ -26,7 +26,7 @@ class SessionManager {
   createSession(phoneNumber) {
     const session = {
       phoneNumber,
-      currentFlow: 'main',
+      currentFlow: 'languageSelection',
       currentStep: 0,
       data: {},
       lastActivity: Date.now()
