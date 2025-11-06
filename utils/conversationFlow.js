@@ -252,19 +252,17 @@ async function processMessage(phoneNumber, message) {
     return await getNextQuestion(sessionManager.getSession(phoneNumber));
   }
 
-  // For regular steps, validate and save the previous step's input
-  if (session.currentStep > 0) {
-    const previousStep = flow.steps[session.currentStep - 1];
-    
+  // Validate and save the current step's input (not previous step)
+  if (currentStep) {
     // Validate input if validator exists
-    if (previousStep.validator && !previousStep.validator(input)) {
-      return previousStep.errorMessage || 'Invalid input. Please try again.';
+    if (currentStep.validator && !currentStep.validator(input)) {
+      return currentStep.errorMessage || 'Invalid input. Please try again.';
     }
 
     // Process and save input
-    if (previousStep.field) {
-      const value = previousStep.processor ? previousStep.processor(input) : input.trim();
-      session.data[previousStep.field] = value;
+    if (currentStep.field) {
+      const value = currentStep.processor ? currentStep.processor(input) : input.trim();
+      session.data[currentStep.field] = value;
     }
   }
 
