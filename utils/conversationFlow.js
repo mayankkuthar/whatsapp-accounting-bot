@@ -9,29 +9,26 @@ const flows = {
   main: {
     steps: [
       {
-        question: `Welcome to Accounting Bot! 📊
+        question: `Hello 👋!
+Welcome to A Kira Shop Daily Tracker 📊
 
 What would you like to do?
 
-1️⃣ Record Income
-2️⃣ Record Expense
-3️⃣ Record Invoice
-4️⃣ View Summary
-5️⃣ View Recent Transactions
-6️⃣ Help
+1️⃣ Record Today's Sales
+2️⃣ View Summary
+3️⃣ View Recent Records
+4️⃣ Help
 
 Reply with the number of your choice.`,
-        validator: (input) => /^[1-6]$/.test(input.trim()),
-        errorMessage: 'Please reply with a number from 1 to 6.',
+        validator: (input) => /^[1-4]$/.test(input.trim()),
+        errorMessage: 'Please reply with a number from 1 to 4.',
         next: (input) => {
           const choice = input.trim();
           const flowMap = {
-            '1': 'income',
-            '2': 'expense',
-            '3': 'invoice',
-            '4': 'summary',
-            '5': 'recent',
-            '6': 'help'
+            '1': 'dailySales',
+            '2': 'summary',
+            '3': 'recent',
+            '4': 'help'
           };
           return flowMap[choice];
         }
@@ -39,164 +36,66 @@ Reply with the number of your choice.`,
     ]
   },
 
-  // Income recording flow
-  income: {
+  // Daily Sales recording flow
+  dailySales: {
     steps: [
       {
-        question: '💰 Record Income\n\nWhat is the amount? (e.g., 1500.00)',
-        field: 'amount',
+        question: "Let's record your shop summary for today.\n\nPlease enter today's total sales (₹):",
+        field: 'sales',
         validator: (input) => /^\d+(\.\d{1,2})?$/.test(input.trim()),
-        errorMessage: 'Please enter a valid amount (e.g., 1500.00)'
+        errorMessage: 'Please enter a valid amount (e.g., 5000 or 5000.50)'
       },
       {
-        question: 'What is the source of this income? (e.g., Sales, Service, Investment)',
-        field: 'category'
+        question: "Thanks! Now enter today's total inventory cost (₹) —\n(that's the total cost of items sold today):",
+        field: 'inventoryCost',
+        validator: (input) => /^\d+(\.\d{1,2})?$/.test(input.trim()),
+        errorMessage: 'Please enter a valid amount (e.g., 3000)'
       },
       {
-        question: 'Please provide a brief description:',
-        field: 'description'
-      },
-      {
-        question: 'Date of transaction? (YYYY-MM-DD or "today")',
-        field: 'date',
-        validator: (input) => {
-          if (input.toLowerCase() === 'today') return true;
-          return /^\d{4}-\d{2}-\d{2}$/.test(input.trim());
-        },
-        errorMessage: 'Please enter date as YYYY-MM-DD or "today"',
-        processor: (input) => input.toLowerCase() === 'today' ? new Date().toISOString().split('T')[0] : input.trim()
+        question: 'Got it ✅\nNow enter your other expenses (₹) for today (like rent, staff, electricity).\nIf none, type 0:',
+        field: 'expenses',
+        validator: (input) => /^\d+(\.\d{1,2})?$/.test(input.trim()),
+        errorMessage: 'Please enter a valid amount or 0'
       },
       {
         question: async (session) => {
+          const sales = parseFloat(session.data.sales);
+          const inventoryCost = parseFloat(session.data.inventoryCost);
+          const expenses = parseFloat(session.data.expenses);
+          const profit = sales - (inventoryCost + expenses);
+          const margin = sales > 0 ? (profit / sales * 100) : 0;
+          const date = new Date().toISOString().split('T')[0];
+
+          // Generate insights
+          let insight = '';
+          if (profit > 0) {
+            if (margin > 30) {
+              insight = '🟢 Great day! Keep it up 👍';
+            } else if (margin >= 10) {
+              insight = '🟡 Good work, but review costs.';
+            } else {
+              insight = '🔻 High costs detected. Try checking product pricing.';
+            }
+          } else {
+            insight = "🔴 You're in loss today. Review your pricing and costs.";
+          }
+
+          // Save data
           const data = {
-            type: 'income',
-            ...session.data
+            type: 'dailySales',
+            category: 'Shop Daily Record',
+            date: date,
+            sales: sales,
+            inventoryCost: inventoryCost,
+            expenses: expenses,
+            profit: profit,
+            margin: margin.toFixed(2),
+            description: `Daily shop record for ${date}`
           };
           
           await dataStorage.saveTransaction(session.phoneNumber, data);
           
-          return `✅ Income Recorded Successfully!
-
-Amount: $${data.amount}
-Category: ${data.category}
-Description: ${data.description}
-Date: ${data.date}
-
-Reply "menu" to return to main menu or record another transaction.`;
-        },
-        isComplete: true
-      }
-    ]
-  },
-
-  // Expense recording flow
-  expense: {
-    steps: [
-      {
-        question: '💸 Record Expense\n\nWhat is the amount? (e.g., 250.50)',
-        field: 'amount',
-        validator: (input) => /^\d+(\.\d{1,2})?$/.test(input.trim()),
-        errorMessage: 'Please enter a valid amount (e.g., 250.50)'
-      },
-      {
-        question: 'What category is this expense? (e.g., Rent, Utilities, Supplies, Salary)',
-        field: 'category'
-      },
-      {
-        question: 'Please provide a brief description:',
-        field: 'description'
-      },
-      {
-        question: 'Date of transaction? (YYYY-MM-DD or "today")',
-        field: 'date',
-        validator: (input) => {
-          if (input.toLowerCase() === 'today') return true;
-          return /^\d{4}-\d{2}-\d{2}$/.test(input.trim());
-        },
-        errorMessage: 'Please enter date as YYYY-MM-DD or "today"',
-        processor: (input) => input.toLowerCase() === 'today' ? new Date().toISOString().split('T')[0] : input.trim()
-      },
-      {
-        question: async (session) => {
-          const data = {
-            type: 'expense',
-            ...session.data
-          };
-          
-          await dataStorage.saveTransaction(session.phoneNumber, data);
-          
-          return `✅ Expense Recorded Successfully!
-
-Amount: $${data.amount}
-Category: ${data.category}
-Description: ${data.description}
-Date: ${data.date}
-
-Reply "menu" to return to main menu.`;
-        },
-        isComplete: true
-      }
-    ]
-  },
-
-  // Invoice recording flow
-  invoice: {
-    steps: [
-      {
-        question: '🧾 Record Invoice\n\nWhat is the invoice amount? (e.g., 3500.00)',
-        field: 'amount',
-        validator: (input) => /^\d+(\.\d{1,2})?$/.test(input.trim()),
-        errorMessage: 'Please enter a valid amount (e.g., 3500.00)'
-      },
-      {
-        question: 'Client/Customer name:',
-        field: 'client'
-      },
-      {
-        question: 'Invoice number:',
-        field: 'invoiceNumber'
-      },
-      {
-        question: 'Service/Product description:',
-        field: 'description'
-      },
-      {
-        question: 'Invoice date? (YYYY-MM-DD or "today")',
-        field: 'date',
-        validator: (input) => {
-          if (input.toLowerCase() === 'today') return true;
-          return /^\d{4}-\d{2}-\d{2}$/.test(input.trim());
-        },
-        errorMessage: 'Please enter date as YYYY-MM-DD or "today"',
-        processor: (input) => input.toLowerCase() === 'today' ? new Date().toISOString().split('T')[0] : input.trim()
-      },
-      {
-        question: 'Payment status? (paid/pending/overdue)',
-        field: 'status',
-        validator: (input) => /^(paid|pending|overdue)$/i.test(input.trim()),
-        errorMessage: 'Please enter: paid, pending, or overdue',
-        processor: (input) => input.trim().toLowerCase()
-      },
-      {
-        question: async (session) => {
-          const data = {
-            type: 'invoice',
-            category: 'Invoice',
-            ...session.data
-          };
-          
-          await dataStorage.saveTransaction(session.phoneNumber, data);
-          
-          return `✅ Invoice Recorded Successfully!
-
-Invoice #: ${data.invoiceNumber}
-Client: ${data.client}
-Amount: $${data.amount}
-Description: ${data.description}
-Date: ${data.date}
-Status: ${data.status}
-
-Reply "menu" to return to main menu.`;
+          return `Here's your summary for ${date} 🧾\n\nTotal Sales: ₹${sales.toFixed(2)}\nInventory Cost: ₹${inventoryCost.toFixed(2)}\nOther Expenses: ₹${expenses.toFixed(2)}\n\n📊 Profit / Loss Calculation:\nProfit = Sales - (Inventory Cost + Expenses)\n\n➡️ Net Profit: ₹${profit.toFixed(2)}\n💹 Profit Margin: ${margin.toFixed(2)}%\n\n💡 Here's what your numbers mean today 👇\n${insight}\n\n✅ Your daily record has been saved.\n\nReply "menu" to return to main menu.`;
         },
         isComplete: true
       }
@@ -208,22 +107,41 @@ Reply "menu" to return to main menu.`;
     steps: [
       {
         question: async (session) => {
-          const summary = await dataStorage.getSummary(session.phoneNumber);
+          const transactions = await dataStorage.getTransactions(session.phoneNumber);
+          const dailyRecords = transactions.filter(t => t.type === 'dailySales');
           
-          let message = `📊 Financial Summary\n\n`;
-          message += `Total Income: $${summary.totalIncome.toFixed(2)}\n`;
-          message += `Total Expenses: $${summary.totalExpense.toFixed(2)}\n`;
-          message += `Net Profit: $${summary.netProfit.toFixed(2)}\n`;
-          message += `Total Transactions: ${summary.count}\n\n`;
+          if (dailyRecords.length === 0) {
+            return '📊 A Kira Shop Summary\n\nNo daily records found yet.\n\nReply "menu" to return to main menu.';
+          }
+
+          let totalSales = 0;
+          let totalInventoryCost = 0;
+          let totalExpenses = 0;
           
-          if (Object.keys(summary.byCategory).length > 0) {
-            message += `By Category:\n`;
-            for (const [category, data] of Object.entries(summary.byCategory)) {
-              message += `  • ${category}: $${data.total.toFixed(2)} (${data.count} transactions)\n`;
-            }
+          dailyRecords.forEach(r => {
+            totalSales += parseFloat(r.sales || 0);
+            totalInventoryCost += parseFloat(r.inventoryCost || 0);
+            totalExpenses += parseFloat(r.expenses || 0);
+          });
+
+          const totalProfit = totalSales - (totalInventoryCost + totalExpenses);
+          const avgMargin = totalSales > 0 ? (totalProfit / totalSales * 100) : 0;
+
+          let message = `📊 A Kira Shop Summary\n\n`;
+          message += `Total Records: ${dailyRecords.length} days\n\n`;
+          message += `Total Sales: ₹${totalSales.toFixed(2)}\n`;
+          message += `Total Inventory Cost: ₹${totalInventoryCost.toFixed(2)}\n`;
+          message += `Total Other Expenses: ₹${totalExpenses.toFixed(2)}\n\n`;
+          message += `➡️ Net Profit: ₹${totalProfit.toFixed(2)}\n`;
+          message += `💹 Average Margin: ${avgMargin.toFixed(2)}%\n\n`;
+          
+          if (totalProfit > 0) {
+            message += '🟢 Overall: Profitable';
+          } else {
+            message += '🔴 Overall: In Loss';
           }
           
-          message += `\nReply "menu" to return to main menu.`;
+          message += '\n\nReply "menu" to return to main menu.';
           return message;
         },
         isComplete: true
@@ -236,17 +154,18 @@ Reply "menu" to return to main menu.`;
     steps: [
       {
         question: async (session) => {
-          const summary = await dataStorage.getSummary(session.phoneNumber);
+          const transactions = await dataStorage.getTransactions(session.phoneNumber);
+          const dailyRecords = transactions.filter(t => t.type === 'dailySales').slice(-5).reverse();
           
-          let message = `📝 Recent Transactions\n\n`;
+          let message = `📝 Recent Daily Records\n\n`;
           
-          if (summary.recent.length === 0) {
-            message += `No transactions recorded yet.\n`;
+          if (dailyRecords.length === 0) {
+            message += `No records found yet.\n`;
           } else {
-            summary.recent.forEach((t, idx) => {
-              message += `${idx + 1}. ${t.type.toUpperCase()} - $${t.amount}\n`;
-              message += `   ${t.category} - ${t.description}\n`;
-              message += `   Date: ${t.date}\n\n`;
+            dailyRecords.forEach((r, idx) => {
+              message += `${idx + 1}. ${r.date}\n`;
+              message += `   Sales: ₹${r.sales} | Profit: ₹${r.profit}\n`;
+              message += `   Margin: ${r.margin}%\n\n`;
             });
           }
           
@@ -264,19 +183,16 @@ Reply "menu" to return to main menu.`;
       {
         question: `📖 Help & Information
 
-This bot helps you capture accounting data for your business through simple Q&A.
+This bot helps you track daily sales for A Kira Shop.
 
 Available Features:
-• Record Income - Track money coming in
-• Record Expense - Track money going out
-• Record Invoice - Manage customer invoices
-• View Summary - See financial overview
-• Recent Transactions - View latest entries
+• Record Today's Sales - Capture daily sales, costs, and expenses
+• View Summary - See overall shop performance
+• Recent Records - View latest daily entries
 
 Commands:
 • "menu" - Return to main menu
 • "cancel" - Cancel current operation
-• "help" - Show this help
 
 Data is saved automatically after each entry.
 
@@ -294,7 +210,7 @@ async function processMessage(phoneNumber, message) {
   const input = message.trim();
   
   // Handle global commands
-  if (input.toLowerCase() === 'menu' || input.toLowerCase() === 'start') {
+  if (input.toLowerCase() === 'menu' || input.toLowerCase() === 'start' || input.toLowerCase() === 'hi' || input.toLowerCase() === 'hello') {
     sessionManager.resetSession(phoneNumber);
     const session = sessionManager.getSession(phoneNumber);
     return await getNextQuestion(session);
