@@ -1,32 +1,19 @@
-const fs = require('fs');
-const path = require('path');
-
 /**
- * Data Storage - Simple JSON file-based storage
- * For production, replace with a database
+ * Data Storage - In-memory storage for serverless environment
+ * For production, replace with a database (MongoDB, PostgreSQL, etc.)
  */
 class DataStorage {
   constructor() {
-    this.dataDir = path.join(process.cwd(), 'data');
-    this.ensureDataDir();
-  }
-
-  ensureDataDir() {
-    if (!fs.existsSync(this.dataDir)) {
-      fs.mkdirSync(this.dataDir, { recursive: true });
-    }
+    // Use in-memory storage for serverless compatibility
+    this.storage = new Map();
   }
 
   async saveTransaction(phoneNumber, transaction) {
     try {
-      const fileName = `${phoneNumber.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
-      const filePath = path.join(this.dataDir, fileName);
+      const key = phoneNumber.replace(/[^a-zA-Z0-9]/g, '_');
       
-      let records = [];
-      if (fs.existsSync(filePath)) {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        records = JSON.parse(content);
-      }
+      // Get existing records or create new array
+      let records = this.storage.get(key) || [];
 
       const record = {
         id: Date.now(),
@@ -35,8 +22,9 @@ class DataStorage {
       };
 
       records.push(record);
-      fs.writeFileSync(filePath, JSON.stringify(records, null, 2));
+      this.storage.set(key, records);
       
+      console.log(`Saved transaction for ${key}:`, record);
       return record;
     } catch (error) {
       console.error('Error saving transaction:', error);
@@ -46,15 +34,10 @@ class DataStorage {
 
   async getTransactions(phoneNumber) {
     try {
-      const fileName = `${phoneNumber.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
-      const filePath = path.join(this.dataDir, fileName);
-      
-      if (!fs.existsSync(filePath)) {
-        return [];
-      }
-
-      const content = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(content);
+      const key = phoneNumber.replace(/[^a-zA-Z0-9]/g, '_');
+      const records = this.storage.get(key) || [];
+      console.log(`Retrieved ${records.length} transactions for ${key}`);
+      return records;
     } catch (error) {
       console.error('Error reading transactions:', error);
       return [];
