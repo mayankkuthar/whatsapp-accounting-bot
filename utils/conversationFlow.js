@@ -229,11 +229,27 @@ async function processMessage(phoneNumber, message) {
     return await getNextQuestion(sessionManager.getSession(phoneNumber));
   }
 
-  const currentStepData = flow.steps[session.currentStep];
+  const currentStep = flow.steps[session.currentStep];
 
-  // If this is not the first step, validate and save input
-  if (session.currentStep > 0 || session.currentFlow !== 'main') {
-    const previousStep = flow.steps[session.currentStep - 1] || flow.steps[session.currentStep];
+  // Handle flow navigation (e.g., main menu selection)
+  if (currentStep && currentStep.next) {
+    // Validate input if validator exists
+    if (currentStep.validator && !currentStep.validator(input)) {
+      return currentStep.errorMessage || 'Invalid input. Please try again.';
+    }
+    
+    const nextFlow = currentStep.next(input);
+    sessionManager.updateSession(phoneNumber, {
+      currentFlow: nextFlow,
+      currentStep: 0,
+      data: {}
+    });
+    return await getNextQuestion(sessionManager.getSession(phoneNumber));
+  }
+
+  // For regular steps, validate and save the previous step's input
+  if (session.currentStep > 0) {
+    const previousStep = flow.steps[session.currentStep - 1];
     
     // Validate input if validator exists
     if (previousStep.validator && !previousStep.validator(input)) {
@@ -244,17 +260,6 @@ async function processMessage(phoneNumber, message) {
     if (previousStep.field) {
       const value = previousStep.processor ? previousStep.processor(input) : input.trim();
       session.data[previousStep.field] = value;
-    }
-
-    // Handle flow navigation
-    if (previousStep.next) {
-      const nextFlow = previousStep.next(input);
-      sessionManager.updateSession(phoneNumber, {
-        currentFlow: nextFlow,
-        currentStep: 0,
-        data: {}
-      });
-      return await getNextQuestion(sessionManager.getSession(phoneNumber));
     }
   }
 
